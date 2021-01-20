@@ -35,6 +35,8 @@ import java.security.MessageDigest;
  */
 public class TestByteBuddy {
 
+    private static final File DEBUGGING_PATH = new File("/Users/chmy/IdeaProjects/byte-buddy-test/debugging");
+
     @Test
     public void test7() throws IOException, NoSuchMethodException, ClassNotFoundException, IllegalAccessException, InstantiationException {
         System.out.println("===== test7 =====");
@@ -43,7 +45,7 @@ public class TestByteBuddy {
                 .subclass(TypeDescription.Generic.Builder.parameterizedType(Repository.class, String.class).build())
                 .name(Repository.class.getPackage().getName().concat(".").concat("UserRepository"))
                 .method(ElementMatchers.named("queryData"))
-                .intercept(MethodDelegation.to(UserRepositoryInterceptor.class))
+                .intercept(MethodDelegation.withDefaultConfiguration().to(UserRepositoryInterceptor.class))
                 .annotateMethod(AnnotationDescription.Builder
                         .ofType(RpcGatewayMethod.class)
                         .define("methodName", "queryData")
@@ -55,7 +57,7 @@ public class TestByteBuddy {
                         .define("timeOut", 350)
                         .build())
                 .make();
-        dynamicType.saveIn(new File(TestByteBuddy.class.getResource("/").getPath()));
+        dynamicType.saveIn(DEBUGGING_PATH);
 
         // 从目标文件夹下加载类信息
         final Class<Repository<String>> userRepository = (Class<Repository<String>>) Class.forName(Repository.class.getPackage().getName().concat(".").concat("UserRepository"));
@@ -83,6 +85,7 @@ public class TestByteBuddy {
                 .method(ElementMatchers.named("queryUserInfo"))
                 .intercept(MethodDelegation.to(MonitorDemo.class))
                 .make();
+        dynamicType.saveIn(DEBUGGING_PATH);
         System.out.println(Decompiler.decompile(dynamicType.getBytes()));
         final BizMethod bizMethod = dynamicType.load(TestByteBuddy.class.getClassLoader())
                 .getLoaded().newInstance();
@@ -95,15 +98,17 @@ public class TestByteBuddy {
     @Test
     public void test1() throws Exception {
         System.out.println("===== test1 =====");
-        Class<?> dynamicType = new ByteBuddy()
+        final DynamicType.Unloaded<Object> dynamicType = new ByteBuddy()
                 .subclass(Object.class)
                 .method(ElementMatchers.named("toString"))
                 .intercept(FixedValue.value("Hello World"))
-                .make()
-                .load(TestByteBuddy.class.getClassLoader())
-                .getLoaded();
+                .make();
 
-        Object instance = dynamicType.newInstance();
+        Class<?> clazz = dynamicType.load(TestByteBuddy.class.getClassLoader())
+                .getLoaded();
+        dynamicType.saveIn(DEBUGGING_PATH);
+
+        Object instance = clazz.newInstance();
         String toString = instance.toString();
         System.out.println(toString);
         System.out.println(instance.getClass().getCanonicalName());
@@ -112,14 +117,15 @@ public class TestByteBuddy {
     @Test
     public void test2() throws IOException {
         System.out.println("===== test2 =====");
-        final DynamicType.Unloaded<Object> make = new ByteBuddy()
+        final DynamicType.Unloaded<Object> dynamicType = new ByteBuddy()
                 // .with(new NamingStrategy.PrefixingRandom("test"))
                 .subclass(Object.class)
                 // .name("example.Type")
                 // .suffix("example.Foo")
                 .make();
-        decompile(make.getBytes());
-        final Class<?> loaded = make.load(TestByteBuddy.class.getClassLoader(), ClassLoadingStrategy.Default.WRAPPER)
+        dynamicType.saveIn(DEBUGGING_PATH);
+        decompile(dynamicType.getBytes());
+        final Class<?> loaded = dynamicType.load(TestByteBuddy.class.getClassLoader(), ClassLoadingStrategy.Default.WRAPPER)
                 .getLoaded();
         final ClassNode classNode = AsmUtils.loadClass(loaded);
         // final ClassReader classReader = new ClassReader(loaded.getName());
@@ -132,18 +138,20 @@ public class TestByteBuddy {
     }
 
     @Test
-    public void test3() {
+    public void test3() throws IOException {
         System.out.println("===== test3 =====");
         ByteBuddyAgent.install();
 
         Foo foo = new Foo();
-        final DynamicType.Unloaded<Bar> make = new ByteBuddy()
+        final DynamicType.Unloaded<Bar> dynamicType = new ByteBuddy()
                 .redefine(Bar.class)
                 .name(Foo.class.getName())
                 .make();
-        decompile(make.getBytes());
 
-        make.load(Foo.class.getClassLoader(), ClassReloadingStrategy.fromInstalledAgent());
+        dynamicType.saveIn(DEBUGGING_PATH);
+        decompile(dynamicType.getBytes());
+
+        dynamicType.load(Foo.class.getClassLoader(), ClassReloadingStrategy.fromInstalledAgent());
 
         System.out.println(foo.foo());
     }
